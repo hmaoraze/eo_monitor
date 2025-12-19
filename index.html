@@ -797,6 +797,8 @@
             'l7Flow_request_ua': '#8b5cf6' // purple
         };
 
+        /** Tool Functions **/
+
         function formatDate(date) {
             return date.toISOString().slice(0, 19) + 'Z';
         }
@@ -949,6 +951,24 @@
             return { unit: '亿次', divisor: 100000000 };
         }
 
+        function getBestUnit(maxValue, type = 'bytes') {
+            const k = 1024;
+            const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            const bitUnits = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps', 'Pbps'];
+            const units = type === 'bandwidth' ? bitUnits : byteUnits;
+
+            if (maxValue === 0) return { unit: units[0], divisor: 1 };
+
+            let i = Math.floor(Math.log(maxValue) / Math.log(k));
+            if (i < 0) i = 0;
+            if (i >= units.length) i = units.length - 1;
+
+            return { unit: units[i], divisor: Math.pow(k, i) };
+        }
+
+        /** Feature Functions **/
+
+        ////ENTRANCE////
         async function initDashboard() {
             // Initialize charts
             chartTraffic = echarts.init(document.getElementById('chart_traffic'));
@@ -1008,29 +1028,15 @@
             }));
 
             // Update UI
-            updateTrafficSection(results);
-            updateBandwidthSection(results);
-            updateOriginPullSection(results);
-            updateRequestsSection(results);
-            updatePerformanceSection(results);
-            updateTopAnalysisSection(results);
+            updateTrafficSection(results); //1.
+            updateBandwidthSection(results); //2.
+            updateOriginPullSection(results); //3.
+            updateRequestsSection(results); //4.
+            updatePerformanceSection(results); //5.
+            updateTopAnalysisSection(results); //6.
         }
 
-        function getBestUnit(maxValue, type = 'bytes') {
-            const k = 1024;
-            const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-            const bitUnits = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps', 'Pbps'];
-            const units = type === 'bandwidth' ? bitUnits : byteUnits;
-
-            if (maxValue === 0) return { unit: units[0], divisor: 1 };
-
-            let i = Math.floor(Math.log(maxValue) / Math.log(k));
-            if (i < 0) i = 0;
-            if (i >= units.length) i = units.length - 1;
-
-            return { unit: units[i], divisor: Math.pow(k, i) };
-        }
-
+        //1.有使用
         function updateTrafficSection(results) {
             const metrics = metricsConfig.traffic;
             const series = [];
@@ -1095,6 +1101,7 @@
             chartTraffic.setOption(option);
         }
 
+        //2.有使用
         function updateBandwidthSection(results) {
             const metrics = metricsConfig.bandwidth;
             const series = [];
@@ -1157,69 +1164,7 @@
             chartBandwidth.setOption(option);
         }
 
-        function updateRequestsSection(results) {
-            const metrics = metricsConfig.requests;
-            const series = [];
-            let timeData = [];
-
-            // Calculate global max
-            let globalMax = 0;
-            metrics.forEach(metric => {
-                const data = results[metric];
-                if (data && data.type === 'time') {
-                    const max = Math.max(...data.valueData);
-                    if (max > globalMax) globalMax = max;
-                }
-            });
-
-            const { unit, divisor } = getBestCountUnit(globalMax);
-
-            metrics.forEach(metric => {
-                const data = results[metric];
-                if (!data || data.type !== 'time') return;
-                
-                // Update KPI
-                document.getElementById(`kpi_${metric}`).innerText = formatCount(data.sum);
-
-                if (timeData.length === 0) timeData = data.timeData;
-
-                // Chart Data (Dynamic Unit)
-                const valueData = data.valueData.map(v => {
-                    const val = v / divisor;
-                    return (divisor === 1) ? val : val.toFixed(2);
-                });
-
-                series.push({
-                    name: metricLabels[metric],
-                    type: 'line',
-                    smooth: true,
-                    data: valueData,
-                    itemStyle: { color: metricColors[metric] },
-                    areaStyle: { opacity: 0.2 },
-                    rawData: data.valueData
-                });
-            });
-
-            const option = {
-                tooltip: { trigger: 'axis', formatter: (params) => {
-                    let res = params[0].axisValue + '<br/>';
-                    params.forEach(param => {
-                        const seriesIndex = param.seriesIndex;
-                        const dataIndex = param.dataIndex;
-                        const rawVal = series[seriesIndex].rawData[dataIndex];
-                        const formattedVal = formatCount(rawVal);
-                        res += `${param.marker}${param.seriesName}: ${formattedVal}<br/>`;
-                    });
-                    return res;
-                }},
-                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-                xAxis: { type: 'category', boundaryGap: false, data: timeData },
-                yAxis: { type: 'value', name: unit },
-                series: series
-            };
-            chartRequests.setOption(option);
-        }
-
+        //3.有使用
         function updateOriginPullSection(results) {
             const metrics = metricsConfig.originPull;
             const series = [];
@@ -1341,6 +1286,71 @@
             chartOriginPull.setOption(option);
         }
 
+        //4.有使用
+        function updateRequestsSection(results) {
+            const metrics = metricsConfig.requests;
+            const series = [];
+            let timeData = [];
+
+            // Calculate global max
+            let globalMax = 0;
+            metrics.forEach(metric => {
+                const data = results[metric];
+                if (data && data.type === 'time') {
+                    const max = Math.max(...data.valueData);
+                    if (max > globalMax) globalMax = max;
+                }
+            });
+
+            const { unit, divisor } = getBestCountUnit(globalMax);
+
+            metrics.forEach(metric => {
+                const data = results[metric];
+                if (!data || data.type !== 'time') return;
+                
+                // Update KPI
+                document.getElementById(`kpi_${metric}`).innerText = formatCount(data.sum);
+
+                if (timeData.length === 0) timeData = data.timeData;
+
+                // Chart Data (Dynamic Unit)
+                const valueData = data.valueData.map(v => {
+                    const val = v / divisor;
+                    return (divisor === 1) ? val : val.toFixed(2);
+                });
+
+                series.push({
+                    name: metricLabels[metric],
+                    type: 'line',
+                    smooth: true,
+                    data: valueData,
+                    itemStyle: { color: metricColors[metric] },
+                    areaStyle: { opacity: 0.2 },
+                    rawData: data.valueData
+                });
+            });
+
+            const option = {
+                tooltip: { trigger: 'axis', formatter: (params) => {
+                    let res = params[0].axisValue + '<br/>';
+                    params.forEach(param => {
+                        const seriesIndex = param.seriesIndex;
+                        const dataIndex = param.dataIndex;
+                        const rawVal = series[seriesIndex].rawData[dataIndex];
+                        const formattedVal = formatCount(rawVal);
+                        res += `${param.marker}${param.seriesName}: ${formattedVal}<br/>`;
+                    });
+                    return res;
+                }},
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: timeData },
+                yAxis: { type: 'value', name: unit },
+                series: series
+            };
+            chartRequests.setOption(option);
+        }
+
+        //5.有使用
         function updatePerformanceSection(results) {
             const metrics = metricsConfig.performance;
             const series = [];
@@ -1375,6 +1385,7 @@
             chartPerformance.setOption(option);
         }
 
+        //通用处理
         const renderTopChart = (results, chartInstance, metricName, mapObject = null) => {
             const data = results[metricName];
             if (!data || data.type !== 'top' || !data.data) return;
@@ -1397,7 +1408,7 @@
                 divisor = best.divisor;
             }
 
-            const yAxisData = sortedData.map(item => mapObject?.[item.Key] || item.Key).reverse();
+            const yAxisData = sortedData.map(item => mapObject?.[item.Key] || item.Key).reverse(); //问题点：没对“字段不存在”的短横杠做判断
             const seriesData = sortedData.map(item => {
                 const val = item.Value / divisor;
                 return (divisor === 1) ? val : val.toFixed(2);
@@ -1462,6 +1473,7 @@
             chartInstance.setOption(option);
         };
 
+        //6.有使用
         function updateTopAnalysisSection(results) {
             // Flux Charts
             renderTopChart(results, chartTopCountry, 'l7Flow_outFlux_country', countryMap);
@@ -1471,7 +1483,8 @@
             renderTopChart(results, chartTopUrl, 'l7Flow_outFlux_url');
             renderTopChart(results, chartTopResourceType, 'l7Flow_outFlux_resourceType');
             renderTopChart(results, chartTopSip, 'l7Flow_outFlux_sip');
-            renderTopChart(results, chartTopReferer, 'l7Flow_outFlux_referers');
+            //renderTopChart(results, chartTopReferer, 'l7Flow_outFlux_referers'); //以前方案
+            updateTopRefererChart(results); //降级处理，包含“字段不存在”处理
             renderTopChart(results, chartTopUaDevice, 'l7Flow_outFlux_ua_device');
             renderTopChart(results, chartTopUaBrowser, 'l7Flow_outFlux_ua_browser');
             renderTopChart(results, chartTopUaOs, 'l7Flow_outFlux_ua_os');
@@ -1485,12 +1498,23 @@
             renderTopChart(results, chartTopRequestUrl, 'l7Flow_request_url');
             renderTopChart(results, chartTopRequestResourceType, 'l7Flow_request_resourceType');
             renderTopChart(results, chartTopRequestSip, 'l7Flow_request_sip');
-            renderTopChart(results, chartTopRequestReferer, 'l7Flow_request_referers');
+            //renderTopChart(results, chartTopRequestReferer, 'l7Flow_request_referers');
+            updateTopRequestRefererChart(results); //降级方案
             renderTopChart(results, chartTopRequestUaDevice, 'l7Flow_request_ua_device');
             renderTopChart(results, chartTopRequestUaBrowser, 'l7Flow_request_ua_browser');
             renderTopChart(results, chartTopRequestUaOs, 'l7Flow_request_ua_os');
             renderTopChart(results, chartTopRequestUa, 'l7Flow_request_ua');
         }
+
+
+
+        /**  
+         *  下面这一堆我也不知道是干嘛的
+         *  可能是二叉脆脆遗留下的降级方案吧
+         *  先不删了，省的再出问题
+         *  不过倒是可以先留着也是，说不定后面可能会用到？
+         *  真的太神秘了
+         * **/
 
         function updateTopCountryChart(results) {
             const metric = 'l7Flow_outFlux_country';
@@ -1771,6 +1795,7 @@
             chartTopSip.setOption(option);
         }
 
+        //无调用，作为备用方案来处理
         function updateTopRefererChart(results) {
             const metric = 'l7Flow_outFlux_referers';
             const data = results[metric];
@@ -1783,7 +1808,7 @@
             const yAxisData = sortedData.map(item => {
                 // Clean up key: remove backticks and trim
                 let key = item.Key.replace(/`/g, '').trim();
-                if (!key || key === '-') return '无/直接访问';
+                if (!key || key === '-') return '字段不存在'; //无/直接访问
                 return key;
             }).reverse();
             
@@ -2248,6 +2273,7 @@
             chartTopRequestSip.setOption(option);
         }
 
+        //无调用，作为备份使用
         function updateTopRequestRefererChart(results) {
             const metric = 'l7Flow_request_referers';
             const data = results[metric];
@@ -2259,7 +2285,7 @@
 
             const yAxisData = sortedData.map(item => {
                  let key = item.Key;
-                 if (key === '-') return '直接访问';
+                 if (key === '-') return '字段不存在'; //直接访问
                  // Clean up backticks and extra spaces
                  key = key.replace(/`/g, '').trim();
                  return key.substring(0, 50) + (key.length > 50 ? '...' : '');
@@ -2277,7 +2303,7 @@
                          let fullName = param.name;
                          if (originalItem) {
                              let key = originalItem.Key;
-                             if (key === '-') fullName = '直接访问';
+                             if (key === '-') fullName = '字段不存在'; //直接访问
                              else fullName = key.replace(/`/g, '').trim();
                          }
                          return `${fullName}<br/>${param.marker}请求数: ${param.value.toLocaleString()} 次`;
@@ -2454,6 +2480,7 @@
 
             chartTopRequestUa.setOption(option);
         }
+        /** 神秘降级方案结束 **/
 
         // Handle Resize
         window.addEventListener('resize', () => {
@@ -2488,7 +2515,7 @@
             chartTopRequestUa && chartTopRequestUa.resize();
         });
 
-        // Start
+        // Start - Entrance
         initDashboard();
     </script>
 </body>
