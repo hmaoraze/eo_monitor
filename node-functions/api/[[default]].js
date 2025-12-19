@@ -82,6 +82,12 @@ const TOP_ANALYSIS_METRICS = [
     'l7Flow_request_ua'
 ];
 
+app.get('/config', (req, res) => {
+    res.json({
+        siteName: process.env.SITE_NAME || 'AcoFork 的 EdgeOne 监控大屏'
+    });
+});
+
 app.get('/traffic', async (req, res) => {
     try {
         const { secretId, secretKey } = getKeys();
